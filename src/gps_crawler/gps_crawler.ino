@@ -1,8 +1,13 @@
 #include <LiquidCrystal.h>
 #include <Servo.h> 
 #include <SoftwareSerial.h>
+#include <TinyGPS.h>
 
-SoftwareSerial gps(12, 2);
+#include <stdarg.h>
+#include <stdio.h>
+
+TinyGPS gps;
+SoftwareSerial ssp(12, 2);
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 // Create a Servo object for each servo
@@ -17,14 +22,34 @@ int pos;             // servo angle 0-180
 int i;               // iterator
 
 // define some values used by the panel and buttons
-int lcd_key     = 0;
-int adc_key_in  = 0;
-#define btnRIGHT  0
-#define btnUP     1
-#define btnDOWN   2
-#define btnLEFT   3
-#define btnSELECT 4
-#define btnNONE   5
+#define btnNONE   0
+#define btnRIGHT  1
+#define btnUP     2
+#define btnDOWN   3
+#define btnLEFT   4
+#define btnSELECT 5
+
+int state       = 5;
+
+
+
+
+static FILE lcdout = {0} ;      // LCD FILE structure
+
+// LCD character writer
+static int lcd_putchar(char ch, FILE* stream)
+{
+    lcd.write(ch) ;
+    return (0) ;
+}
+
+
+
+
+
+
+
+
 
 
 void setup() 
@@ -32,38 +57,58 @@ void setup()
   lcd.begin(16, 2);
   lcd.clear();
   lcd.print("Initializing...");
- 
-  gps.begin(4800);
+  ssp.begin(9600);
   Serial.begin(19200);
-
 //  servo1.attach(52);
 //  motor1.attach(53);
-  
-//  arm();
-
   lcd.setCursor(0, 1);
   lcd.print(millis()/1000);
   lcd.print("s elapsed");
   
-
+  
+     // fill in the LCD FILE structure
+   fdev_setup_stream (&lcdout, lcd_putchar, NULL, _FDEV_SETUP_WRITE);
+  
 } 
 
 
 
 
 void loop() 
-{ 
-  // Wait for serial input (min 3 bytes in buffer)
+{
+    
+      switch (state) {
+        case 0:
+          delay(1000);
+          state++;
+          break;
+        case 1:
+          menu_root();
+          break;
+        case 2:
+          menu_arm();
+          break;
+        case 3:
+          menu_searching();
+          break;
+        case 5:
+          menu_lat_lon();
+          break;
+      }
+  
+//  bool newdata = false;
+//  unsigned long start = millis();
+//  while (millis() - start < 1000)
+//  {
+    // spend 1 second listening to gps data and 
+//    if (feedgps()) newdata = true;
+//  }
+//  gpsdump(gps);
   
   
   
-    if (gps.available())
-//    Serial.write(gps.read());
-     lcd.print(gps.read());
-//    if (Serial.available())
-//    gps.write(Serial.read());
   
-  
+//  Serial.print(ssp.read());
 //  if (Serial.available() > 2) {
     // Read the first byte
 //    startbyte = Serial.read();
@@ -96,6 +141,114 @@ void loop()
 }
 
 
+void menu_root()
+{
+  lcd.clear();
+  lcd.print("Welcome.");
+  delay(1000);
+}
+
+void menu_arm()
+{
+  boolean done = false;
+  lcd.clear();
+  lcd.print("Arm ESC?");
+  while (! done)
+  {
+    if (get_button() == btnSELECT) {  
+      lcd.setCursor(0, 1);
+      lcd.print("done.");
+    } 
+  }
+}
+void menu_searching()
+{
+  boolean done = false;
+  lcd.clear();
+  lcd.print("Searching for");
+  lcd.setCursor(1, 1);
+  lcd.print("satellites...");
+  while (! done)
+  {
+    
+    lcd.setCursor(11, 1);
+    lcd.print(" ");
+    delay(800);
+    lcd.setCursor(11, 1);
+    lcd.print(".");
+    lcd.setCursor(12, 1);
+    lcd.print(" ");
+    delay(800);
+    lcd.setCursor(12, 1);
+    lcd.print(".");
+    lcd.setCursor(13, 1);
+    lcd.print(" ");
+    delay(800);
+    lcd.setCursor(13, 1);
+    lcd.print(".");
+  }
+}
+
+
+
+void menu_lat_lon()
+{
+    float lat, lon;
+    unsigned long age;
+    
+    char *buf;
+
+    
+    
+    unsigned long start = millis();
+
+    while (millis() - start < 1000)
+    {
+      if (feedgps()){
+        gps.f_get_position(&lat, &lon, &age);
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        
+         lcd.print("Lat:  ");
+         lcd.print(lat);
+
+        lcd.setCursor(0, 1);
+        lcd.print("Lon: ");
+        lcd.print(lon);
+      }
+    }
+}
+
+
+static void gpsdump(TinyGPS &gps)
+{
+  float flat, flon;
+  unsigned long age, date, time, chars = 0;
+  unsigned short sentences = 0, failed = 0;
+  static const float LONDON_LAT = 51.508131, LONDON_LON = -0.128002;
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Satellites: ");
+  lcd.print(gps.satellites());
+  lcd.setCursor(0, 1);
+  
+  print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
+  print_int(gps.hdop(), TinyGPS::GPS_INVALID_HDOP, 5);
+  gps.f_get_position(&flat, &flon, &age);
+  print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 9, 5);
+  print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 10, 5);
+  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
+  print_date(gps);
+  Serial.println();
+}
+
+
+
+
+
+
+
 void arm()
 {
   int speed;
@@ -116,19 +269,100 @@ void lcd_status()
 
 
 // read the buttons
-int read_LCD_buttons()
+int get_button()
 {
- adc_key_in = analogRead(0);      // read the value from the sensor 
+ int key_in = analogRead(0);      // read the value from the sensor 
  // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
  // we add approx 50 to those values and check to see if we are close
- if (adc_key_in > 1000) return btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
- if (adc_key_in < 50)   return btnRIGHT;  
- if (adc_key_in < 195)  return btnUP; 
- if (adc_key_in < 380)  return btnDOWN; 
- if (adc_key_in < 555)  return btnLEFT; 
- if (adc_key_in < 790)  return btnSELECT;   
+ if (key_in > 1000) return btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
+ if (key_in < 50)   return btnRIGHT;  
+ if (key_in < 195)  return btnUP; 
+ if (key_in < 380)  return btnDOWN; 
+ if (key_in < 555)  return btnLEFT; 
+ if (key_in < 790)  return btnSELECT;   
  return btnNONE;  // when all others fail, return this...
 }
+
+
+
+
+static void print_int(unsigned long val, unsigned long invalid, int len)
+{
+  char sz[32];
+  if (val == invalid)
+    strcpy(sz, "*******");
+  else
+    sprintf(sz, "%ld", val);
+  sz[len] = 0;
+  for (int i=strlen(sz); i<len; ++i)
+    sz[i] = ' ';
+  if (len > 0) 
+    sz[len-1] = ' ';
+  Serial.print(sz);
+  feedgps();
+}
+
+static void print_float(float val, float invalid, int len, int prec)
+{
+  char sz[32];
+  if (val == invalid)
+  {
+    strcpy(sz, "*******");
+    sz[len] = 0;
+        if (len > 0) 
+          sz[len-1] = ' ';
+    for (int i=7; i<len; ++i)
+        sz[i] = ' ';
+    Serial.print(sz);
+  }
+  else
+  {
+    Serial.print(val, prec);
+    int vi = abs((int)val);
+    int flen = prec + (val < 0.0 ? 2 : 1);
+    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
+    for (int i=flen; i<len; ++i)
+      Serial.print(" ");
+  }
+  feedgps();
+}
+
+static void print_date(TinyGPS &gps)
+{
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  unsigned long age;
+  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
+  if (age == TinyGPS::GPS_INVALID_AGE)
+    Serial.print("*******    *******    ");
+  else
+  {
+    char sz[32];
+    sprintf(sz, " %02d:%02d:%02d ",
+        hour, minute, second);
+    lcd.print(sz);
+  }
+  feedgps();
+}
+
+static void print_str(const char *str, int len)
+{
+  int slen = strlen(str);
+  for (int i=0; i<len; ++i)
+    Serial.print(i<slen ? str[i] : ' ');
+  feedgps();
+}
+
+static bool feedgps()
+{
+  while (ssp.available())
+  {
+    if (gps.encode(ssp.read()))
+      return true;
+  }
+  return false;
+}
+
 
 
 
