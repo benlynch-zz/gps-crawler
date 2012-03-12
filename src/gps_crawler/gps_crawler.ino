@@ -3,16 +3,13 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS.h>
 
-#include <stdarg.h>
-#include <stdio.h>
-
 TinyGPS gps;
 SoftwareSerial ssp(12, 2);
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 // Create a Servo object for each servo
-//Servo servo1;
-//Servo motor1;
+Servo servo1;
+Servo motor1;
 
 // User input for servo and position
 int userInput[3];    // raw input from serial buffer, 3 bytes
@@ -30,26 +27,7 @@ int i;               // iterator
 #define btnSELECT 5
 
 int state       = 5;
-
-
-
-
-static FILE lcdout = {0} ;      // LCD FILE structure
-
-// LCD character writer
-static int lcd_putchar(char ch, FILE* stream)
-{
-    lcd.write(ch) ;
-    return (0) ;
-}
-
-
-
-
-
-
-
-
+static FILE lcdout = {0} ;      
 
 
 void setup() 
@@ -61,22 +39,15 @@ void setup()
   Serial.begin(19200);
 //  servo1.attach(52);
 //  motor1.attach(53);
+  fdev_setup_stream (&lcdout, lcd_putchar, NULL, _FDEV_SETUP_WRITE);
   lcd.setCursor(0, 1);
   lcd.print(millis()/1000);
   lcd.print("s elapsed");
-  
-  
-     // fill in the LCD FILE structure
-   fdev_setup_stream (&lcdout, lcd_putchar, NULL, _FDEV_SETUP_WRITE);
-  
 } 
-
-
 
 
 void loop() 
 {
-    
       switch (state) {
         case 0:
           delay(1000);
@@ -94,6 +65,24 @@ void loop()
         case 5:
           menu_lat_lon();
           break;
+        case 6:
+          menu_sats();
+          break;
+        case 7:
+          menu_time();
+          break;
+        case 8:
+          menu_manual();
+          break;
+        case 9:
+          menu_go_waypoint();
+          break;
+        case 10:
+          menu_next_waypoint();
+          break;
+        case 11:
+          menu_moving();
+          break;
       }
   
 //  bool newdata = false;
@@ -104,10 +93,6 @@ void loop()
 //    if (feedgps()) newdata = true;
 //  }
 //  gpsdump(gps);
-  
-  
-  
-  
 //  Serial.print(ssp.read());
 //  if (Serial.available() > 2) {
     // Read the first byte
@@ -124,7 +109,6 @@ void loop()
 //      pos = userInput[1];
       // Packet error checking and recovery
 //      if (pos == 255) { servo = 255; }
-
       // Assign new position to appropriate servo
 //      switch (servo) {
 //        case 1:
@@ -134,7 +118,6 @@ void loop()
 //          motor1.write(pos);
 //          break;
 //      }
-
 //    }
 //  }
 
@@ -170,7 +153,6 @@ void menu_searching()
   lcd.print("satellites...");
   while (! done)
   {
-    
     lcd.setCursor(11, 1);
     lcd.print(" ");
     delay(800);
@@ -189,36 +171,89 @@ void menu_searching()
   }
 }
 
-
-
 void menu_lat_lon()
 {
+    boolean done = false;
     float lat, lon;
     unsigned long age;
-    
-    char *buf;
-
-    
-    
+    char buf[32];
     unsigned long start = millis();
-
     while (millis() - start < 1000)
     {
       if (feedgps()){
         gps.f_get_position(&lat, &lon, &age);
         lcd.clear();
         lcd.setCursor(0, 0);
-        
-         lcd.print("Lat:  ");
-         lcd.print(lat);
-
+        lcd.print("Lat:  ");
+        ftoa(buf, lat);
+        lcd.print(buf);
         lcd.setCursor(0, 1);
         lcd.print("Lon: ");
         lcd.print(lon);
       }
-    }
+   }
 }
 
+static void menu_sats()
+{
+    boolean done = false;
+    lcd.setCursor(0, 0);
+    lcd.print("Satellites: ");
+    lcd.print(gps.satellites());
+    lcd.setCursor(0, 1);
+    lcd.print("HDOP: ");
+    lcd.print(gps.hdop());
+}
+
+static void menu_time()
+{
+  boolean done = false;
+  while (! done)
+  {
+    if (get_button() == btnSELECT) {
+    }
+  }
+}
+
+static void menu_manual()
+{
+  boolean done = false;
+    while (! done)
+  {
+    if (get_button() == btnSELECT) {
+    }
+  }
+}
+
+static void menu_go_waypoint()
+{
+  boolean done = false;
+    while (! done)
+  {
+    if (get_button() == btnSELECT) {
+    }
+  }
+}
+
+static void menu_next_waypoint()
+{
+  boolean done = false;
+    while (! done)
+  {
+    if (get_button() == btnSELECT) {
+    }
+  }
+}
+
+static void menu_moving()
+{
+  boolean done = false;
+  while (! done)
+  {
+    if (get_button() == btnSELECT) {
+    }
+  }
+}
 
 static void gpsdump(TinyGPS &gps)
 {
@@ -226,13 +261,11 @@ static void gpsdump(TinyGPS &gps)
   unsigned long age, date, time, chars = 0;
   unsigned short sentences = 0, failed = 0;
   static const float LONDON_LAT = 51.508131, LONDON_LON = -0.128002;
-
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Satellites: ");
   lcd.print(gps.satellites());
   lcd.setCursor(0, 1);
-  
   print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
   print_int(gps.hdop(), TinyGPS::GPS_INVALID_HDOP, 5);
   gps.f_get_position(&flat, &flon, &age);
@@ -262,25 +295,20 @@ void arm()
 }
 
 
-void lcd_status()
-{
-  
-}
-
 
 // read the buttons
 int get_button()
 {
- int key_in = analogRead(0);      // read the value from the sensor 
- // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
- // we add approx 50 to those values and check to see if we are close
- if (key_in > 1000) return btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
- if (key_in < 50)   return btnRIGHT;  
- if (key_in < 195)  return btnUP; 
- if (key_in < 380)  return btnDOWN; 
- if (key_in < 555)  return btnLEFT; 
- if (key_in < 790)  return btnSELECT;   
- return btnNONE;  // when all others fail, return this...
+  int key_in = analogRead(0);      // read the value from the sensor 
+  // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
+  // we add approx 50 to those values and check to see if we are close
+  if (key_in > 1000) return btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
+  if (key_in < 50)   return btnRIGHT;  
+  if (key_in < 195)  return btnUP; 
+  if (key_in < 380)  return btnDOWN; 
+  if (key_in < 555)  return btnLEFT; 
+  if (key_in < 790)  return btnSELECT;   
+  return btnNONE;  // when all others fail, return this...
 }
 
 
@@ -363,6 +391,23 @@ static bool feedgps()
   return false;
 }
 
+// LCD character writer
+static int lcd_putchar(char ch, FILE* stream)
+{
+    lcd.write(ch) ;
+    return (0) ;
+}
 
+static char * ftoa (char *buf, float val )
+{
+  char *ret = buf;
+  long whole = (long) val;
+  itoa (whole, buf, 10);
+  while (*buf != '\0') buf++;
+  *buf++ = '.';
+  long decimal = abs((long)((val - whole) * 100000));
+  itoa(decimal, buf, 10);
+  return ret;
+}
 
 
