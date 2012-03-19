@@ -4,6 +4,7 @@ Hardware consists of:
 
 Arduino MEGA 2560
 DFRobot DFR0009  (LCD Shield for Arduino)
+DFRobot Xbee USB adapter
 DIGI Xbee Pro
 SeedStudio GPS Bee
 Bees Shield V2.12

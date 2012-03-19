@@ -178,6 +178,9 @@ void menu_ask_manual()
   lcd.print(" Mode?");
   
   delay(500);
+  
+  Serial.print("manual");
+  
   while (! done)
   {
     int butt = get_button();
@@ -219,22 +222,33 @@ void menu_lat_lon()
     lcd.print("Lon: ********");
     delay(5000);
     
-    unsigned long start = millis();
-    while (millis() - start < 2000)
+    
+    
+    while (! done)
     {
-      if (feedgps()){
-        gps.f_get_position(&lat, &lon, &age);
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Lat:  ");
-        ftoa(buf, lat);
-        lcd.print(buf);
-        lcd.setCursor(0, 1);
-        lcd.print("Lon: ");
-        ftoa(buf, lon);
-        lcd.print(buf);
+    
+      int butt = get_button();
+      if (butt == btnLEFT | butt == btnRIGHT | butt == btnUP | butt == btnDOWN | butt == btnSELECT ){  
+        state = 6;
+        done = true;
+      } 
+      unsigned long start = millis();
+      while (millis() - start < 2000)
+      {
+        if (feedgps()){
+          gps.f_get_position(&lat, &lon, &age);
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("Lat:  ");
+          ftoa(buf, lat);
+          lcd.print(buf);
+          lcd.setCursor(0, 1);
+          lcd.print("Lon: ");
+          ftoa(buf, lon);
+          lcd.print(buf);
+        }
       }
-   }
+    }
 }
 
 void menu_sats()
@@ -280,8 +294,8 @@ void menu_manual()
   lcd.print("   DIR:RT");
   delay(500);  
 
-  int svals[11] = {5,10,15,20,25,30,35,40,45,50,55};
-  int tvals[11] = {5,10,15,20,25,30,35,40,45,50,55};
+  int svals[11] = {145,135,125,115,105,95,85,75,65,55,50};
+  int tvals[11] = {60,70,80,90,100,110,120,130,140,150,160};
 
   int steer     = 6;
   int throttle  = 6;
@@ -301,7 +315,7 @@ void menu_manual()
     }  
     if (nsteer != steer)
     {
-      if (nsteer > 0 && nsteer < 11)
+      if (nsteer > -1 && nsteer < 11)
       {
         steer = nsteer;
         servo1.write(svals[steer]);
@@ -312,7 +326,7 @@ void menu_manual()
       if (nthrottle > 0 && nthrottle < 11)
       {
         throttle = nthrottle;
-        motor1.write(svals[throttle]);
+        motor1.write(tvals[throttle]);
       } 
     }
     int butt = get_button();
